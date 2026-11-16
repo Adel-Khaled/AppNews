@@ -137,7 +137,7 @@ object TextAnalysis {
     /** Words that commonly mark breaking/urgent coverage. */
     fun looksBreaking(title: String): Boolean {
         val t = title.lowercase()
-        return listOf("breaking", "just in", "urgent", "developing", "عاجل", "خبر عاجل").any { it in t }
+        return listOf("breaking news", "breaking:", "just in", "عاجل").any { it in t }
     }
 
     fun hoursBetween(a: Long, b: Long): Double = abs(a - b) / 3_600_000.0

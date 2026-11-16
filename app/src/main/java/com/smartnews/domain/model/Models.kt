@@ -71,7 +71,11 @@ data class Article(
     /** True when the text shown for [lang] is a machine translation. */
     fun isTranslated(lang: String) = trLang == lang && titleTr != null
     fun titleFor(lang: String) = if (isTranslated(lang)) titleTr!! else title
-    fun descriptionFor(lang: String) = if (trLang == lang && descriptionTr != null) descriptionTr else description
+    fun descriptionFor(lang: String): String {
+        // Google News descriptions just repeat the headline + publisher; don't show them.
+        if (description.startsWith(title.take(40))) return ""
+        return if (trLang == lang && descriptionTr != null) descriptionTr else description
+    }
 }
 
 data class Story(

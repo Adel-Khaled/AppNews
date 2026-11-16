@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -94,7 +95,7 @@ fun MultimediaScreen(nav: Nav, vm: MultimediaViewModel = hiltViewModel()) {
     LaunchedEffect(tab) { if (tab == 2) vm.loadLive() }
 
     ScreenFrame(tr("Videos", "فيديو"), nav, isRefreshing = liveLoading, onRefresh = if (tab == 2) ({ vm.loadLive(); Unit }) else null) {
-        TabRow(selectedTabIndex = tab) {
+        TabRow(selectedTabIndex = tab, modifier = Modifier.testTag("videos-screen")) {
             listOf(tr("Videos", "فيديو"), tr("Images", "صور"), tr("Live", "مباشر")).forEachIndexed { i, t -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(t) }) }
         }
         when (tab) {

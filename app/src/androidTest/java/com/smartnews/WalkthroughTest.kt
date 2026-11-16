@@ -44,6 +44,7 @@ class WalkthroughTest {
         inst.targetContext.startActivity(i)
         device.wait(Until.hasObject(By.pkg(pkg).depth(0)), 15_000)
     }
+    private fun keyboardShown() = device.executeShellCommand("dumpsys input_method").contains("mInputShown=true")
     private fun titles(res: String = "story-title") = device.findObjects(By.res(res)).mapNotNull { it.text }
     private fun arabicShare(list: List<String>): Double {
         if (list.isEmpty()) return 0.0
@@ -75,7 +76,11 @@ class WalkthroughTest {
         click("tab-all")
 
         // 3. Egypt (local) news.
-        if (click("scope-local")) { check("Egypt (local) shows stories", has("story", 120_000)); shot("04_local_egypt") }
+        if (click("scope-local")) {
+            check("Egypt (local) shows stories", has("story", 120_000))
+            Thread.sleep(20_000)
+            shot("04_local_egypt")
+        }
         alive("local")
 
         // 4. Arabic: UI and news in Arabic, including world news.
@@ -100,7 +105,7 @@ class WalkthroughTest {
         alive("latest")
 
         // 6. Videos.
-        if (click("nav-videos")) shot("09_videos")
+        if (click("nav-videos")) { check("videos screen opens", has("videos-screen", 15_000)); shot("09_videos") }
         alive("videos")
 
         // 7. Search (was crashing).
@@ -108,8 +113,11 @@ class WalkthroughTest {
             device.wait(Until.findObject(By.res("search-field")), 10_000)?.let { f ->
                 f.click(); f.text = "مصر"
                 click("search-go")
-                check("search returns articles", has("article", 90_000))
+                check("search returns articles", has("search-results", 90_000))
+                Thread.sleep(1500)
+                check("keyboard hidden after searching", !keyboardShown())
                 shot("10_search")
+                if (keyboardShown()) device.pressBack()
             } ?: run { failures += "search field missing" }
         }
         alive("search")
@@ -118,14 +126,15 @@ class WalkthroughTest {
         click("nav-home")
         device.wait(Until.findObject(By.res("story")), 60_000)?.click()
         check("story page opens", has("story-detail", 30_000))
-        Thread.sleep(4000)
+        Thread.sleep(8000)
         shot("11_story_detail")
+        device.findObject(By.res("story-detail"))?.let { it.scroll(androidx.test.uiautomator.Direction.DOWN, 0.8f); Thread.sleep(1500); shot("11b_story_detail_scrolled") }
         click("save-story")
         device.pressBack()
         alive("story")
 
         // 9. Saved.
-        if (click("nav-saved")) { check("saved article listed", has("article", 15_000)); shot("12_saved") }
+        if (click("nav-saved")) { check("saved article listed", has("saved-list", 15_000)); shot("12_saved") }
         alive("saved")
 
         // 10. Settings.

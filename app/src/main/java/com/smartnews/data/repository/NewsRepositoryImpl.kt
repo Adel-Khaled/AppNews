@@ -260,7 +260,7 @@ class NewsRepositoryImpl @Inject constructor(
             val kwEn = c.keywordsEn.split(',').map { it.trim() }.filter { it.isNotEmpty() }
             tasks += FetchTask(g, "Google News", GoogleNews.search("$kwAr مصر", "ar", "EG", days = 3), id, "google-news", Scope.LOCAL, 30)
             // World coverage: the English edition has the widest international reach; it is translated on device.
-            tasks += FetchTask(g, "Google News", GoogleNews.search(kwEn.joinToString(" OR "), "en", "US", days = 2), id, "google-news", Scope.GLOBAL, 30)
+            tasks += FetchTask(g, "Google News", GoogleNews.search(kwEn.joinToString(" OR "), "en", "US", days = 2), id, "google-news", Scope.GLOBAL, if (ar) 12 else 30)
             if (ar) tasks += FetchTask(g, "Google News", GoogleNews.search("$kwAr -مصر", "ar", "EG", days = 2), id, "google-news", Scope.GLOBAL, 20)
         }
         return tasks
@@ -299,7 +299,10 @@ class NewsRepositoryImpl @Inject constructor(
         }
         val generic = setOf("general", "local", "international")
         val byId = LinkedHashMap<String, Pair<ArticleEntity, Incoming>>()
-        for (inc in incoming) {
+        for (raw in incoming) {
+            // Skip placeholder headlines some feeds emit (e.g. "META_TITLE_QUOTE").
+            if (raw.title.length < 12 || Regex("^[A-Z0-9_ ]+$").matches(raw.title) && raw.title.contains('_')) continue
+            val inc = if (raw.description.startsWith(raw.title.take(40))) raw.copy(description = "") else raw
             val id = TextAnalysis.sha1(TextAnalysis.canonicalUrl(inc.url))
             if (id in byId) continue
             val text = inc.title + ". " + inc.description
@@ -405,9 +408,11 @@ class NewsRepositoryImpl @Inject constructor(
             val target = s.language
             if (!translator.supported(target)) return@withContext 0
             var done = 0
+            val t0 = System.currentTimeMillis()
             for (a in articleDao.needingTranslation(target, limit)) {
                 if (translateArticle(a, target)) done++ else break // model missing / offline: retry later
             }
+            android.util.Log.i("SmartNewsTr", "translated $done to $target in ${System.currentTimeMillis() - t0} ms")
             done
         }
     }
