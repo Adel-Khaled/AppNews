@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -39,6 +42,18 @@ jobs:
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           chmod +x gradlew
           ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleRelease
+
+      # Also keep the latest APKs on the "apk-builds" branch for easy direct download.
+      - name: Publish APKs to apk-builds branch
+        if: github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p /tmp/apk && cp app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk /tmp/apk/
+          cd /tmp/apk
+          git init -q -b apk-builds
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A && git commit -q -m "APKs from ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" apk-builds
 
       - uses: actions/upload-artifact@v4
         with:
