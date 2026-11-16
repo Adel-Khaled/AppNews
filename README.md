@@ -1,5 +1,7 @@
 # SmartNews: Personal Global News & Multimedia Aggregator
 
+> **v1.1:** Category tabs on Home · Egypt (local) / World (global) switch · full Arabic mode (Arabic interface plus on-device translation of foreign news) · simpler navigation (Home, Latest, Videos, Saved, Search) · fix for the crash in Latest, Search and For You · an emulator walkthrough test in CI that publishes screenshots to the `ui-shots` branch. The latest APKs are always on the `apk-builds` branch.
+
 SmartNews is a native Android app written in Kotlin with Jetpack Compose and Material 3. It collects news from publisher RSS feeds, Google News, news APIs and your own sources. Articles from different publishers that cover the same event are grouped into one story, along with related videos, images and interviews. Everything is stored on the phone, so news stays available offline and is never deleted by a refresh.
 
 ```
