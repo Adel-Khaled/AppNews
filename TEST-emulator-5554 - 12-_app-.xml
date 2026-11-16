@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.smartnews.WalkthroughTest" tests="1" failures="0" errors="0" skipped="0" time="165.368" timestamp="2026-11-16T16:57:24" hostname="localhost">
+  <properties>
+    <property name="device" value="emulator-5554 - 12" />
+    <property name="flavor" value="" />
+    <property name="project" value=":app" />
+  </properties>
+  <testcase name="walkthrough" classname="com.smartnews.WalkthroughTest" time="164.052" />
+</testsuite>
