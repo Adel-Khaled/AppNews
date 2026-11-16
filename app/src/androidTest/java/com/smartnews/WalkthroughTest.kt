@@ -31,11 +31,13 @@ class WalkthroughTest {
     private fun has(res: String, ms: Long) = device.wait(Until.hasObject(By.res(res)), ms) == true
     /** Tabs further along the row are off-screen; swipe the row until the tab appears. */
     private fun clickTab(id: String): Boolean {
-        repeat(8) { i ->
+        repeat(10) { i ->
             device.findObject(By.res("tab-$id"))?.let { it.click(); return true }
-            val dir = if (i < 4) androidx.test.uiautomator.Direction.LEFT else androidx.test.uiautomator.Direction.RIGHT
-            runCatching { device.findObject(By.res("tab-row"))?.scroll(dir, 0.6f) }
-            Thread.sleep(500)
+            val row = device.findObject(By.res("tab-row"))?.visibleBounds ?: return@repeat
+            val y = row.centerY()
+            // Real finger swipe; first one way (Arabic: later tabs are on the left), then the other.
+            if (i < 5) device.swipe(row.left + 60, y, row.right - 60, y, 20) else device.swipe(row.right - 60, y, row.left + 60, y, 20)
+            Thread.sleep(700)
         }
         failures += "tab '$id' not reachable"; return false
     }
@@ -105,6 +107,7 @@ class WalkthroughTest {
             check("Arabic: local headlines in Arabic", waitArabic("story-title", 120_000, 0.8))
             shot("05_arabic_local")
             click("scope-global")
+            Thread.sleep(5000)
             check("Arabic: world headlines translated to Arabic", waitArabic("story-title", 300_000, 0.6))
             shot("06_arabic_global")
             if (clickTab("sports")) { check("Arabic sports tab shows stories", has("story", 120_000)); shot("07_arabic_sports") }
