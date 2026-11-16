@@ -1,0 +1,14 @@
+{
+  "name": "smartnews-backend",
+  "version": "1.0.0",
+  "description": "SmartNews aggregation, video matching and AI backend. Holds every API key so the Android app never does.",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": { "node": ">=22.9" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "start:plain": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "license": "MIT"
+}
