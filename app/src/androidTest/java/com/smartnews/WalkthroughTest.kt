@@ -29,6 +29,16 @@ class WalkthroughTest {
         log("shot $name")
     }
     private fun has(res: String, ms: Long) = device.wait(Until.hasObject(By.res(res)), ms) == true
+    /** Tabs further along the row are off-screen; swipe the row until the tab appears. */
+    private fun clickTab(id: String): Boolean {
+        repeat(8) { i ->
+            device.findObject(By.res("tab-$id"))?.let { it.click(); return true }
+            val dir = if (i < 4) androidx.test.uiautomator.Direction.LEFT else androidx.test.uiautomator.Direction.RIGHT
+            runCatching { device.findObject(By.res("tab-row"))?.scroll(dir, 0.6f) }
+            Thread.sleep(500)
+        }
+        failures += "tab '$id' not reachable"; return false
+    }
     private fun click(res: String): Boolean {
         val o = device.wait(Until.findObject(By.res(res)), 10_000) ?: run { failures += "missing element '$res'"; return false }
         o.click(); return true
@@ -97,7 +107,7 @@ class WalkthroughTest {
             click("scope-global")
             check("Arabic: world headlines translated to Arabic", waitArabic("story-title", 300_000, 0.6))
             shot("06_arabic_global")
-            if (click("tab-sports")) { has("story", 120_000); shot("07_arabic_sports") }
+            if (clickTab("sports")) { check("Arabic sports tab shows stories", has("story", 120_000)); shot("07_arabic_sports") }
         }
         alive("arabic")
 
