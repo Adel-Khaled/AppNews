@@ -45,7 +45,9 @@ class WalkthroughTest {
         device.wait(Until.hasObject(By.pkg(pkg).depth(0)), 15_000)
     }
     private fun keyboardShown() = device.executeShellCommand("dumpsys input_method").contains("mInputShown=true")
-    private fun titles(res: String = "story-title") = device.findObjects(By.res(res)).mapNotNull { it.text }
+    // Lists update live while news arrives, so a node can go stale between finding and reading it.
+    private fun titles(res: String = "story-title"): List<String> =
+        runCatching { device.findObjects(By.res(res)).mapNotNull { o -> runCatching { o.text }.getOrNull() } }.getOrDefault(emptyList())
     private fun arabicShare(list: List<String>): Double {
         if (list.isEmpty()) return 0.0
         return list.count { t -> t.count { it in '؀'..'ۿ' } > t.count { it.isLetter() } / 2 }.toDouble() / list.size
