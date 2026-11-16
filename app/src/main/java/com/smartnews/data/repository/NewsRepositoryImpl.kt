@@ -290,7 +290,7 @@ class NewsRepositoryImpl @Inject constructor(
         if (title.count { it in "[]<>{}*%|" } >= 3) return true
         val t = title.lowercase()
         return Regex("live ?stream|watch (it )?(free|online)|full match|free tv|tv channel|streaming free|reddit stream").containsMatchIn(t) &&
-            Regex("\bvs\.?\b|free|tv channel|reddit|online").containsMatchIn(t)
+            Regex("\\bvs\\.?\\b|free|tv channel|reddit|online").containsMatchIn(t)
     }
 
     private data class StoreResult(val inserted: Int, val updated: Int, val newMedia: Int)
