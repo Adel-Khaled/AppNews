@@ -1,8 +1,10 @@
 package com.smartnews.sync
 
+import com.smartnews.domain.model.RefreshResult
 import com.smartnews.domain.repository.NewsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,36 +14,48 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
-data class RefreshState(val isRefreshing: Boolean = false, val message: String? = null)
+data class RefreshState(
+    val isRefreshing: Boolean = false,
+    val refreshingCategory: String? = null,
+    val translating: Boolean = false,
+    val result: RefreshResult? = null,
+    val failed: Boolean = false,
+)
 
 /**
- * App-wide refresh: every screen's Refresh button / pull-to-refresh shares one state, and the
- * work keeps running if the user navigates away mid-refresh.
+ * App-wide refresh and translation. Every screen shares this state, and the work keeps running
+ * when the user switches tabs.
  */
 @Singleton
 class RefreshController @Inject constructor(private val repository: NewsRepository) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _state = MutableStateFlow(RefreshState())
     val state: StateFlow<RefreshState> = _state.asStateFlow()
+    private var translateJob: Job? = null
 
     fun refresh(categoryId: String? = null) {
         if (_state.value.isRefreshing) return
-        _state.value = RefreshState(isRefreshing = true)
+        _state.update { it.copy(isRefreshing = true, refreshingCategory = categoryId, result = null, failed = false) }
         scope.launch {
-            val msg = runCatching { repository.refresh(categoryId) }.fold(
-                onSuccess = { r ->
-                    buildString {
-                        append(if (r.newArticles == 0) "No new articles" else "${r.newArticles} new articles")
-                        if (r.updatedArticles > 0) append(", ${r.updatedArticles} updated")
-                        if (r.newVideos > 0) append(", ${r.newVideos} videos/images")
-                        if (r.sourcesFailed > 0) append(" · ${r.sourcesFailed} source(s) unavailable — see My Sources")
-                    }
-                },
-                onFailure = { "Refresh failed: ${it.message}" },
-            )
-            _state.value = RefreshState(isRefreshing = false, message = msg)
+            val r = runCatching { repository.refresh(categoryId) }
+            _state.update { it.copy(isRefreshing = false, refreshingCategory = null, result = r.getOrNull(), failed = r.isFailure) }
+            translate()
         }
     }
 
-    fun consumeMessage() = _state.update { it.copy(message = null) }
+    /** Translates new articles in small batches so the newest appear in the user's language first. */
+    fun translate() {
+        if (translateJob?.isActive == true) return
+        translateJob = scope.launch {
+            _state.update { it.copy(translating = true) }
+            var rounds = 0
+            while (rounds++ < 60) {
+                val n = runCatching { repository.translatePending(25) }.getOrDefault(0)
+                if (n == 0) break
+            }
+            _state.update { it.copy(translating = false) }
+        }
+    }
+
+    fun consumeResult() = _state.update { it.copy(result = null, failed = false) }
 }

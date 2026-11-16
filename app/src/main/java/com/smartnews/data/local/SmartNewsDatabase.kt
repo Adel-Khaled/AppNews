@@ -2,6 +2,8 @@ package com.smartnews.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.smartnews.domain.model.Article
 import com.smartnews.domain.model.Category
 import com.smartnews.domain.model.MediaItem
@@ -16,7 +18,7 @@ import com.smartnews.domain.model.Story
         CategoryEntity::class, SourceEntity::class, ArticleEntity::class,
         StoryEntity::class, MediaEntity::class, HistoryEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class SmartNewsDatabase : RoomDatabase() {
@@ -26,6 +28,23 @@ abstract class SmartNewsDatabase : RoomDatabase() {
     abstract fun storyDao(): StoryDao
     abstract fun mediaDao(): MediaDao
     abstract fun historyDao(): HistoryDao
+
+    companion object {
+        /** v2: local/global scope and machine translations. Keeps every stored article. */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE articles ADD COLUMN scope TEXT NOT NULL DEFAULT 'global'")
+                db.execSQL("ALTER TABLE articles ADD COLUMN titleTr TEXT")
+                db.execSQL("ALTER TABLE articles ADD COLUMN descriptionTr TEXT")
+                db.execSQL("ALTER TABLE articles ADD COLUMN trLang TEXT")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_articles_scope ON articles(scope)")
+                db.execSQL("ALTER TABLE stories ADD COLUMN hasLocal INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE stories ADD COLUMN hasGlobal INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE stories ADD COLUMN headlineTr TEXT")
+                db.execSQL("ALTER TABLE stories ADD COLUMN trLang TEXT")
+            }
+        }
+    }
 }
 
 // ---- Entity <-> domain mapping ----
@@ -51,6 +70,7 @@ fun ArticleEntity.toDomain() = Article(
     isSaved = isSaved, isRead = isRead, summary = summary,
     keyPoints = keyPoints.split('\n').filter { it.isNotBlank() }, summaryIsAi = summaryIsAi,
     entities = entities.split('|').filter { it.isNotBlank() },
+    language = language, scope = scope, titleTr = titleTr, descriptionTr = descriptionTr, trLang = trLang,
 )
 
 fun StoryEntity.toDomain() = Story(
@@ -58,7 +78,7 @@ fun StoryEntity.toDomain() = Story(
     firstPublishedAt = firstPublishedAt, lastPublishedAt = lastPublishedAt, updatedAt = updatedAt,
     articleCount = articleCount, sourceCount = sourceCount, isBreaking = isBreaking, isSaved = isSaved,
     aiSummary = aiSummary, aiKeyPoints = aiKeyPoints.split('\n').filter { it.isNotBlank() },
-    leadSourceName = leadSourceName,
+    leadSourceName = leadSourceName, headlineTr = headlineTr, trLang = trLang,
 )
 
 fun MediaEntity.toDomain() = MediaItem(

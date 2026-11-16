@@ -56,6 +56,10 @@ object GoogleNews {
     fun top(lang: String, country: String) =
         "https://news.google.com/rss?hl=${hl(lang, country)}&gl=$country&ceid=$country:$lang"
 
+    /** Google News world section, in the given edition. */
+    fun world(lang: String, country: String) =
+        "https://news.google.com/rss/headlines/section/topic/WORLD?hl=${hl(lang, country)}&gl=$country&ceid=$country:$lang"
+
     /** Google News "national" section: headlines for the selected country (used for Local News). */
     fun nation(lang: String, country: String) =
         "https://news.google.com/rss/headlines/section/topic/NATION?hl=${hl(lang, country)}&gl=$country&ceid=$country:$lang"

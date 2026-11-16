@@ -33,14 +33,23 @@ android {
         applicationId = "com.smartnews"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         buildConfigField("String", "DEFAULT_BACKEND_URL", "\"${prop("smartnews.backendUrl")}\"")
         buildConfigField("String", "DEFAULT_APP_TOKEN", "\"${prop("smartnews.appToken")}\"")
         vectorDrawables { useSupportLibrary = true }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
+        // A fixed debug key kept in the repo, so every CI build has the same signature and
+        // a new APK installs as an update over the previous one.
+        getByName("debug") {
+            storeFile = rootProject.file("keystore/smartnews-debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         if (keystoreProps.getProperty("storeFile") != null) {
             create("release") {
                 storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
@@ -116,5 +125,11 @@ dependencies {
     implementation(libs.androidx.datastore)
     implementation(libs.jsoup)
 
+    implementation(libs.mlkit.translate)
+    implementation(libs.mlkit.language.id)
+
     testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.uiautomator)
 }

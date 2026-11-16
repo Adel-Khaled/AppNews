@@ -64,7 +64,7 @@ class SourceRepositoryImpl @Inject constructor(
 
     override suspend fun discover(url: String): SourceDiscoveryResult {
         val s = settings.snapshot()
-        return discovery.discover(url, s.language, s.country, backend.isConfigured)
+        return discovery.discover(url, s.language, "EG", backend.isConfigured)
     }
 
     override suspend fun addSource(result: SourceDiscoveryResult, name: String, categoryId: String?): String {

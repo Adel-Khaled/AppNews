@@ -66,6 +66,16 @@ object DefaultCatalog {
         F("defensenews", "Defense News", "https://www.defensenews.com", "https://www.defensenews.com/arc/outboundfeeds/rss/", "security"),
     )
 
+    /** Arabic-language international publishers (added in seed v2). */
+    private val arabicFeeds = listOf(
+        F("bbc-arabic", "بي بي سي عربي", "https://www.bbc.com/arabic", "https://feeds.bbci.co.uk/arabic/rss.xml", "international"),
+        F("france24-ar", "فرانس 24 عربي", "https://www.france24.com/ar/", "https://www.france24.com/ar/rss", "international"),
+        F("dw-ar", "DW عربية", "https://www.dw.com/ar/", "https://rss.dw.com/rdf/rss-ar-all", "international"),
+    )
+
+    /** Every built-in feed URL (used by the CI feed check). */
+    val allFeedUrls: List<String> get() = (feeds + arabicFeeds).map { it.feed }
+
     fun sourceEntities(now: Long): List<SourceEntity> = feeds.map {
         SourceEntity(
             id = it.id, name = it.name, siteUrl = it.site, feedUrl = it.feed, type = SourceType.RSS.name,
@@ -73,13 +83,26 @@ object DefaultCatalog {
         )
     }
 
+    fun arabicSourceEntities(now: Long): List<SourceEntity> = arabicFeeds.map {
+        SourceEntity(
+            id = it.id, name = it.name, siteUrl = it.site, feedUrl = it.feed, type = SourceType.RSS.name,
+            categoryId = it.cat, language = "ar", enabled = true, isCustom = false, createdAt = now,
+        )
+    }
+
+    /** Categories shown as tabs on Home (local/international are covered by the Egypt/World switch). */
+    val tabCategoryIds = listOf(
+        "politics", "economy", "business", "technology", "ai", "science", "sports", "health", "entertainment",
+        "celebrities", "movies", "automotive", "education", "environment", "travel", "gaming", "security",
+    )
+
     /** Pseudo-source used for articles that come from Google News search feeds. */
     const val GOOGLE_NEWS_SOURCE_ID = "google-news"
     /** Pseudo-source used for articles that come from the backend's news APIs. */
     const val BACKEND_SOURCE_ID = "backend-apis"
 
     fun systemSources(now: Long) = listOf(
-        SourceEntity(GOOGLE_NEWS_SOURCE_ID, "Google News (category & topic search)", "https://news.google.com", null,
+        SourceEntity(GOOGLE_NEWS_SOURCE_ID, "Google News", "https://news.google.com", null,
             SourceType.GOOGLE_NEWS.name, null, null, enabled = true, isCustom = false, createdAt = now),
         SourceEntity(BACKEND_SOURCE_ID, "News APIs via your backend (NewsAPI, GNews, Guardian)", "", null,
             SourceType.BACKEND_API.name, null, null, enabled = true, isCustom = false, createdAt = now),

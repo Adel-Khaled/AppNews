@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -33,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -43,14 +45,12 @@ import coil.imageLoader
 import com.smartnews.BuildConfig
 import com.smartnews.data.remote.BackendApi
 import com.smartnews.data.remote.BackendConfig
-import com.smartnews.data.repository.SettingsRepositoryImpl
 import com.smartnews.domain.model.AppSettings
-import com.smartnews.domain.model.SortMode
+import com.smartnews.domain.model.Scope
 import com.smartnews.domain.model.ThemeMode
-import com.smartnews.domain.repository.CategoryRepository
 import com.smartnews.domain.repository.NewsRepository
 import com.smartnews.domain.repository.SettingsRepository
-import com.smartnews.domain.repository.SourceRepository
+import com.smartnews.ui.components.tr
 import com.smartnews.ui.navigation.Nav
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -65,12 +65,8 @@ class SettingsViewModel @Inject constructor(
     private val news: NewsRepository,
     private val api: BackendApi,
     private val backend: BackendConfig,
-    categoryRepo: CategoryRepository,
-    sourceRepo: SourceRepository,
 ) : ViewModel() {
     val settings = repo.settings
-    val categories = stateOf(categoryRepo.observeCategories(), emptyList())
-    val sources = stateOf(sourceRepo.observeSources(), emptyList())
     val articleCount = stateOf(news.observeArticleCount(), 0)
     val backendStatus = MutableStateFlow<String?>(null)
     val message = MutableStateFlow<String?>(null)
@@ -80,139 +76,117 @@ class SettingsViewModel @Inject constructor(
     fun saveBackend(url: String, token: String) = viewModelScope.launch {
         repo.update { it.copy(backendUrl = url.trim(), appToken = token.trim()) }
         backend.update(url, token)
-        testBackend()
-    }
-
-    fun testBackend() = viewModelScope.launch {
-        if (!backend.isConfigured) { backendStatus.value = "Not configured — SmartNews runs in RSS + Google News mode."; return@launch }
-        backendStatus.value = "Testing…"
+        if (!backend.isConfigured) { backendStatus.value = "—"; return@launch }
+        backendStatus.value = "…"
         backendStatus.value = runCatching { api.health() }.fold(
-            { h ->
-                val on = h.providers.filterValues { it }.keys.joinToString().ifBlank { "none" }
-                val off = h.providers.filterValues { !it }.keys.joinToString().ifBlank { "none" }
-                "Connected (backend ${h.version}). Enabled: $on. Missing keys: $off."
-            },
-            { "Can't reach backend: ${it.message}" },
+            { h -> "OK ${h.version}: " + h.providers.filterValues { it }.keys.joinToString().ifBlank { "-" } },
+            { "Error: ${it.message}" },
         )
     }
 
     @OptIn(ExperimentalCoilApi::class)
-    fun clearImageCache(context: Context) = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            context.imageLoader.diskCache?.clear()
-        }
+    fun clearImageCache(context: Context, done: String) = viewModelScope.launch {
+        withContext(Dispatchers.IO) { context.imageLoader.diskCache?.clear() }
         context.imageLoader.memoryCache?.clear()
-        message.value = "Image cache cleared. Articles were not affected."
+        message.value = done
     }
 
-    fun cleanup(days: Int) = viewModelScope.launch {
-        val n = news.deleteOldUnsaved(days)
-        message.value = "Removed $n unsaved articles older than $days days. Saved articles and history were kept."
-    }
+    fun cleanup(done: (Int) -> String) = viewModelScope.launch { message.value = done(news.deleteOldUnsaved(365)) }
 }
 
 @Composable
 fun SettingsScreen(nav: Nav, vm: SettingsViewModel = hiltViewModel()) {
     val s by vm.settings.collectAsStateWithLifecycle()
-    val categories by vm.categories.collectAsStateWithLifecycle()
-    val sources by vm.sources.collectAsStateWithLifecycle()
     val count by vm.articleCount.collectAsStateWithLifecycle()
     val backendStatus by vm.backendStatus.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var confirmCleanup by remember { mutableStateOf(false) }
+    val ar = s.language == "ar"
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         vm.update { it.copy(notificationsEnabled = granted) }
     }
+    val cacheDone = tr("Image cache cleared.", "تم مسح ذاكرة الصور.")
 
-    ScreenFrame("Settings", nav, showSearch = false) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 32.dp)) {
+    ScreenFrame(tr("Settings", "الإعدادات"), nav, isTopLevel = false) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 32.dp).testTag("settings-screen")) {
             message?.let { Text(it, color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(16.dp)) }
 
-            Section("Appearance")
-            ChipRow(ThemeMode.entries, s.themeMode, { it.name.lowercase().replaceFirstChar { c -> c.uppercase() } }) { m -> vm.update { it.copy(themeMode = m) } }
+            Section(tr("Language", "اللغة"))
+            ChipRow(listOf("ar", "en"), s.language, { if (it == "ar") "العربية" else "English" }, "lang") { l -> vm.update { it.copy(language = l) } }
+            Toggle(tr("Translate news into the app language", "ترجمة الأخبار إلى لغة التطبيق"),
+                tr("Foreign news is translated on your phone (free). Models download once.", "تُترجم الأخبار الأجنبية على هاتفك مجاناً. يتم تنزيل نموذج الترجمة مرة واحدة."),
+                s.translateNews) { v -> vm.update { it.copy(translateNews = v) } }
 
-            Section("Language & region")
-            ChipRow(SettingsRepositoryImpl.SUPPORTED_LANGUAGES.keys.toList(), s.language, { SettingsRepositoryImpl.SUPPORTED_LANGUAGES[it] ?: it }) { l -> vm.update { it.copy(language = l) } }
-            var country by rememberSaveable(s.country) { mutableStateOf(s.country) }
-            Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(country, { country = it.take(2).uppercase() }, label = { Text("Country code (local news)") }, singleLine = true, modifier = Modifier.weight(1f))
-                TextButton(enabled = country.length == 2 && country != s.country, onClick = { vm.update { it.copy(country = country) } }) { Text("Save") }
-            }
-            Hint("Used for Local News and Google News results. Example: EG, US, GB, SA, AE, FR.")
-
-            Section("Feed")
-            Toggle("Use Google News search feeds", "Finds coverage for every enabled category and topic across thousands of publishers.", s.useGoogleNews) { v -> vm.update { it.copy(useGoogleNews = v) } }
-            Text("Default sort", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 16.dp, top = 8.dp))
-            ChipRow(SortMode.entries, s.sortMode, { if (it == SortMode.NEWEST) "Newest first" else "Most relevant" }) { m -> vm.update { it.copy(sortMode = m) } }
-            Row(Modifier.padding(horizontal = 8.dp)) {
-                TextButton(onClick = { nav.top("categories") }) { Text("Preferred categories (${categories.count { it.enabled }})") }
-                TextButton(onClick = { nav.top("sources") }) { Text("News sources (${sources.count { it.enabled }})") }
+            Section(tr("Default news", "الأخبار الافتراضية"))
+            ChipRow(listOf(Scope.LOCAL, Scope.GLOBAL), s.scope, { if (it == Scope.LOCAL) (if (ar) "🇪🇬 محلي (مصر)" else "🇪🇬 Local (Egypt)") else (if (ar) "🌍 عالمي" else "🌍 Global") }, "scope") { sc ->
+                vm.update { it.copy(scope = sc) }
             }
 
-            Section("Automatic updates")
-            ChipRow(listOf(0, 1, 3, 6, 12, 24), s.refreshIntervalHours, { if (it == 0) "Manual" else "Every ${it}h" }) { h -> vm.update { it.copy(refreshIntervalHours = h) } }
-            Toggle("Only sync on Wi-Fi", null, s.wifiOnlySync) { v -> vm.update { it.copy(wifiOnlySync = v) } }
-            Hint("Background sync uses Android WorkManager; Android may delay it to save battery. Refreshing never deletes stored news.")
+            Section(tr("Appearance", "المظهر"))
+            ChipRow(ThemeMode.entries, s.themeMode, {
+                when (it) { ThemeMode.SYSTEM -> if (ar) "تلقائي" else "System"; ThemeMode.LIGHT -> if (ar) "فاتح" else "Light"; ThemeMode.DARK -> if (ar) "داكن" else "Dark" }
+            }, "theme") { m -> vm.update { it.copy(themeMode = m) } }
 
-            Section("Notifications")
-            Toggle("Enable notifications", "At most ${s.maxNotificationsPerDay} per day.", s.notificationsEnabled) { v ->
+            Section(tr("Automatic updates", "التحديث التلقائي"))
+            ChipRow(listOf(0, 1, 3, 6, 12), s.refreshIntervalHours, {
+                if (it == 0) (if (ar) "يدوي" else "Manual") else (if (ar) "كل $it س" else "Every ${it}h")
+            }, "interval") { h -> vm.update { it.copy(refreshIntervalHours = h) } }
+            Toggle(tr("Only on Wi-Fi", "عبر الواي فاي فقط"), null, s.wifiOnlySync) { v -> vm.update { it.copy(wifiOnlySync = v) } }
+
+            Section(tr("Notifications", "الإشعارات"))
+            Toggle(tr("Breaking news alerts", "تنبيهات الأخبار العاجلة"), tr("At most ${s.maxNotificationsPerDay} per day.", "بحد أقصى ${s.maxNotificationsPerDay} يومياً."),
+                s.notificationsEnabled && s.notifyBreaking) { v ->
                 if (v && Build.VERSION.SDK_INT >= 33) permission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                else vm.update { it.copy(notificationsEnabled = v) }
-            }
-            if (s.notificationsEnabled) {
-                Toggle("Breaking news", "Stories reported by several outlets within hours.", s.notifyBreaking) { v -> vm.update { it.copy(notifyBreaking = v) } }
-                Text("Important developments in", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 16.dp, top = 8.dp))
-                MultiChipRow(categories.filter { it.enabled }.map { it.id to it.displayName() }, s.notifyCategoryIds) { set -> vm.update { it.copy(notifyCategoryIds = set) } }
-                Text("New articles from", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 16.dp, top = 8.dp))
-                MultiChipRow(sources.filter { it.isCustom }.map { it.id to it.name }, s.notifySourceIds) { set -> vm.update { it.copy(notifySourceIds = set) } }
-                Text("Maximum per day", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 16.dp, top = 8.dp))
-                ChipRow(listOf(2, 5, 10, 20), s.maxNotificationsPerDay, { "$it" }) { n -> vm.update { it.copy(maxNotificationsPerDay = n) } }
+                vm.update { it.copy(notificationsEnabled = v, notifyBreaking = v) }
             }
 
-            Section("Video & data")
-            Toggle("Autoplay videos", "Start playing as soon as a video opens.", s.videoAutoplay) { v -> vm.update { it.copy(videoAutoplay = v) } }
-            Toggle("Load images only on Wi-Fi", "On mobile data, only images already cached are shown.", s.imagesOnWifiOnly) { v -> vm.update { it.copy(imagesOnWifiOnly = v) } }
+            Section(tr("Video & data", "الفيديو والبيانات"))
+            Toggle(tr("Autoplay videos", "تشغيل الفيديو تلقائياً"), null, s.videoAutoplay) { v -> vm.update { it.copy(videoAutoplay = v) } }
+            Toggle(tr("Load images only on Wi-Fi", "تحميل الصور عبر الواي فاي فقط"), null, s.imagesOnWifiOnly) { v -> vm.update { it.copy(imagesOnWifiOnly = v) } }
 
-            Section("Backend (AI, YouTube, news APIs)")
+            Section(tr("Sources", "المصادر"))
+            Hint(tr("Add any news website, RSS feed or YouTube channel.", "أضف أي موقع أخبار أو موجز RSS أو قناة يوتيوب."))
+            Button(onClick = { nav.sources() }, modifier = Modifier.padding(horizontal = 16.dp).testTag("open-sources")) { Text(tr("My Sources", "مصادري")) }
+
+            Section(tr("Storage", "التخزين"))
+            Hint(tr("$count articles stored on this phone.", "$count خبر محفوظ على هذا الهاتف."))
+            Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { vm.clearImageCache(context, cacheDone) }) { Text(tr("Clear image cache", "مسح ذاكرة الصور")) }
+                OutlinedButton(onClick = { confirmCleanup = true }) { Text(tr("Delete old news", "حذف الأخبار القديمة")) }
+            }
+
+            Section(tr("Advanced: backend", "متقدم: الخادم"))
+            Hint(tr("Optional. Adds AI summaries, YouTube videos and more news APIs. See README.", "اختياري. يضيف ملخصات الذكاء الاصطناعي وفيديو يوتيوب ومصادر إضافية. راجع ملف README."))
             var url by rememberSaveable(s.backendUrl) { mutableStateOf(s.backendUrl) }
             var token by rememberSaveable(s.appToken) { mutableStateOf(s.appToken) }
             Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(url, { url = it }, label = { Text("Backend URL (e.g. https://smartnews.example.com)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(token, { token = it }, label = { Text("App token") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { vm.saveBackend(url, token) }) { Text("Save & test") }
-                    OutlinedButton(onClick = { vm.testBackend() }) { Text("Test") }
-                }
+                OutlinedTextField(url, { url = it }, label = { Text(tr("Backend URL", "رابط الخادم")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(token, { token = it }, label = { Text(tr("App token", "رمز التطبيق")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Button(onClick = { vm.saveBackend(url, token) }) { Text(tr("Save & test", "حفظ واختبار")) }
                 backendStatus?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             }
-            Hint("Optional. Without it SmartNews still works with RSS feeds and Google News, using on-device extracts instead of AI summaries. API keys live only on the backend, never in the app.")
-
-            Section("Storage")
-            Hint("$count articles stored on this phone.")
-            Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { vm.clearImageCache(context) }) { Text("Clear image cache") }
-                OutlinedButton(onClick = { confirmCleanup = true }) { Text("Clean up old news") }
-            }
-
-            Section("About")
-            Hint("SmartNews ${BuildConfig.VERSION_NAME}. Every article links to its original publisher. AI-generated text is always labelled. Videos play through official players or open in their own app.")
+            Hint("SmartNews ${BuildConfig.VERSION_NAME}")
         }
     }
 
-    if (confirmCleanup) AlertDialog(
-        onDismissRequest = { confirmCleanup = false },
-        title = { Text("Clean up old news?") },
-        text = { Text("Deletes unsaved articles published more than 12 months ago that you never opened. Saved articles and reading history are kept. This is the only action in SmartNews that deletes news.") },
-        confirmButton = { TextButton(onClick = { vm.cleanup(365); confirmCleanup = false }) { Text("Delete") } },
-        dismissButton = { TextButton(onClick = { confirmCleanup = false }) { Text("Cancel") } },
-    )
+    if (confirmCleanup) {
+        val done: (Int) -> String = if (ar) { n -> "تم حذف $n خبر قديم غير محفوظ." } else { n -> "Deleted $n old unsaved articles." }
+        AlertDialog(
+            onDismissRequest = { confirmCleanup = false },
+            title = { Text(tr("Delete old news?", "حذف الأخبار القديمة؟")) },
+            text = { Text(tr("Deletes unsaved news older than 12 months. Saved articles are kept. Refreshing never deletes news.",
+                "يحذف الأخبار غير المحفوظة الأقدم من ١٢ شهراً. تبقى المحفوظات كما هي. التحديث لا يحذف الأخبار أبداً.")) },
+            confirmButton = { TextButton(onClick = { vm.cleanup(done); confirmCleanup = false }) { Text(tr("Delete", "حذف")) } },
+            dismissButton = { TextButton(onClick = { confirmCleanup = false }) { Text(tr("Cancel", "إلغاء")) } },
+        )
+    }
 }
 
 @Composable
 private fun Section(title: String) {
     HorizontalDivider(Modifier.padding(top = 16.dp))
-    Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp))
+    Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp))
 }
 
 @Composable
@@ -231,18 +205,10 @@ private fun Toggle(title: String, subtitle: String?, checked: Boolean, onChange:
 }
 
 @Composable
-private fun <T> ChipRow(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
-    LazyRow(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(options) { o -> FilterChip(selected = o == selected, onClick = { onSelect(o) }, label = { Text(label(o)) }) }
-    }
-}
-
-@Composable
-private fun MultiChipRow(options: List<Pair<String, String>>, selected: Set<String>, onChange: (Set<String>) -> Unit) {
-    if (options.isEmpty()) { Hint("Nothing to choose yet."); return }
-    LazyRow(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(options, key = { it.first }) { (id, name) ->
-            FilterChip(selected = id in selected, onClick = { onChange(if (id in selected) selected - id else selected + id) }, label = { Text(name) })
+private fun <T> ChipRow(options: List<T>, selected: T, label: (T) -> String, tag: String, onSelect: (T) -> Unit) {
+    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(options) { o ->
+            FilterChip(selected = o == selected, onClick = { onSelect(o) }, label = { Text(label(o)) }, modifier = Modifier.testTag("$tag-$o"))
         }
     }
 }

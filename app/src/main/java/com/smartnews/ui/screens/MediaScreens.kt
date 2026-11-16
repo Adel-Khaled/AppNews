@@ -56,6 +56,7 @@ import com.smartnews.domain.repository.SettingsRepository
 import com.smartnews.ui.components.EmptyState
 import com.smartnews.ui.components.NewsImage
 import com.smartnews.ui.components.VideoCard
+import com.smartnews.ui.components.tr
 import com.smartnews.ui.navigation.Nav
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -92,16 +93,16 @@ fun MultimediaScreen(nav: Nav, vm: MultimediaViewModel = hiltViewModel()) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(tab) { if (tab == 2) vm.loadLive() }
 
-    ScreenFrame("Multimedia", nav, isRefreshing = liveLoading, onRefresh = if (tab == 2) ({ vm.loadLive(); Unit }) else null) {
+    ScreenFrame(tr("Videos", "فيديو"), nav, isRefreshing = liveLoading, onRefresh = if (tab == 2) ({ vm.loadLive(); Unit }) else null) {
         TabRow(selectedTabIndex = tab) {
-            listOf("Videos", "Images", "Live").forEachIndexed { i, t -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(t) }) }
+            listOf(tr("Videos", "فيديو"), tr("Images", "صور"), tr("Live", "مباشر")).forEachIndexed { i, t -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(t) }) }
         }
         when (tab) {
-            0 -> if (videos.isEmpty()) EmptyState("No videos yet", "Videos appear as you open stories (publishers' embedded videos) and, with the backend, from YouTube matching.", Icons.Default.VideoLibrary)
+            0 -> if (videos.isEmpty()) EmptyState(tr("No videos yet", "لا توجد فيديوهات بعد"), tr("Videos appear here when you open news stories that include them.", "تظهر الفيديوهات هنا عند فتح الأخبار التي تحتوي عليها."), Icons.Default.VideoLibrary)
             else LazyVerticalGrid(GridCells.Adaptive(300.dp), contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 items(videos, key = { it.id }) { v -> VideoCard(v, onClick = { nav.play(v) }, width = null) }
             }
-            1 -> if (images.isEmpty()) EmptyState("No images yet", "Images from articles and galleries collect here.")
+            1 -> if (images.isEmpty()) EmptyState(tr("No images yet", "لا توجد صور بعد"), tr("Images from the news appear here.", "تظهر صور الأخبار هنا."))
             else LazyVerticalGrid(GridCells.Adaptive(160.dp), contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(images.distinctBy { it.url }, key = { it.id }) { img ->
                     Column(Modifier.clickable { if (img.storyId.length > 10) nav.story(img.storyId) }) {
@@ -111,15 +112,15 @@ fun MultimediaScreen(nav: Nav, vm: MultimediaViewModel = hiltViewModel()) {
                 }
             }
             else -> Column {
-                liveError?.let {
+                liveError?.takeIf { it != "backend" }?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
                 }
                 Text(
-                    "Only broadcasts the platform reports as live right now are labelled LIVE.",
+                    tr("Only broadcasts that are live right now are labelled LIVE.", "تظهر علامة مباشر فقط للبث الجاري الآن."),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
                 val current = live.filter { it.isLive }
-                if (current.isEmpty() && !liveLoading) EmptyState("No live streams found", "Tap refresh to look again.", Icons.Default.LiveTv)
+                if (current.isEmpty() && !liveLoading) EmptyState(tr("No live streams found", "لا يوجد بث مباشر"), if (vm.backendConfigured.value) tr("Tap refresh to look again.", "اضغط تحديث للبحث مرة أخرى.") else tr("Live streams need the SmartNews backend (Settings).", "البث المباشر يحتاج إلى خادم سمارت نيوز (الإعدادات)."), Icons.Default.LiveTv)
                 LazyVerticalGrid(GridCells.Adaptive(300.dp), contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     items(current, key = { it.id }) { v -> VideoCard(v, onClick = { nav.play(v) }, width = null) }
                 }
@@ -145,13 +146,13 @@ fun PlayerScreen(nav: Nav, url: String, title: String, vm: PlayerViewModel = hil
         }
     }
     DisposableEffect(player) { onDispose { player.release() } }
-    ScreenFrame(title.ifBlank { "Video" }, nav, isTopLevel = false, showSearch = false) {
+    ScreenFrame(title.ifBlank { tr("Video", "فيديو") }, nav, isTopLevel = false) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)) {
             AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxSize())
         }
         Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp))
         TextButton(onClick = { nav.openUrl(url) }, modifier = Modifier.padding(horizontal = 8.dp)) {
-            Icon(Icons.AutoMirrored.Filled.OpenInNew, null); Text("  Open original")
+            Icon(Icons.AutoMirrored.Filled.OpenInNew, null); Text("  " + tr("Open original", "فتح المصدر"))
         }
     }
 }
@@ -173,7 +174,7 @@ fun YouTubePlayerScreen(nav: Nav, videoId: String, title: String, url: String, v
           referrerpolicy="strict-origin-when-cross-origin"></iframe>
         </body></html>
     """.trimIndent()
-    ScreenFrame(title.ifBlank { "Video" }, nav, isTopLevel = false, showSearch = false) {
+    ScreenFrame(title.ifBlank { tr("Video", "فيديو") }, nav, isTopLevel = false) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)) {
             AndroidView(
                 factory = { ctx ->
@@ -193,7 +194,7 @@ fun YouTubePlayerScreen(nav: Nav, videoId: String, title: String, url: String, v
         }
         Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp))
         Button(onClick = { nav.openUrl(url.ifBlank { "https://www.youtube.com/watch?v=$videoId" }) }, modifier = Modifier.padding(horizontal = 16.dp)) {
-            Icon(Icons.AutoMirrored.Filled.OpenInNew, null); Text("  Open in YouTube")
+            Icon(Icons.AutoMirrored.Filled.OpenInNew, null); Text("  " + tr("Open in YouTube", "فتح في يوتيوب"))
         }
     }
 }

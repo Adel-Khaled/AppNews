@@ -46,7 +46,9 @@ object AppModule {
 
     @Provides @Singleton
     fun database(@ApplicationContext context: Context): SmartNewsDatabase =
-        Room.databaseBuilder(context, SmartNewsDatabase::class.java, "smartnews.db").build()
+        Room.databaseBuilder(context, SmartNewsDatabase::class.java, "smartnews.db")
+            .addMigrations(SmartNewsDatabase.MIGRATION_1_2)
+            .build()
 
     @Provides fun categoryDao(db: SmartNewsDatabase): CategoryDao = db.categoryDao()
     @Provides fun sourceDao(db: SmartNewsDatabase): SourceDao = db.sourceDao()

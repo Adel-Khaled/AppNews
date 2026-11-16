@@ -11,3 +11,5 @@ keystore.properties
 captures/
 backend/node_modules/
 backend/.env
+
+!keystore/smartnews-debug.keystore

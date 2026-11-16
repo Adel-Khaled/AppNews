@@ -9,14 +9,6 @@ import androidx.room.Update
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
-data class StoryAgg(
-    val articleCount: Int,
-    val sourceCount: Int,
-    val firstPublishedAt: Long,
-    val lastPublishedAt: Long,
-    val imageUrl: String?,
-)
-
 data class SourceCount(val sourceId: String, val c: Int)
 
 data class HistoryWithArticle(
@@ -113,10 +105,28 @@ interface ArticleDao {
     @Query(
         """SELECT * FROM articles WHERE (:categoryId IS NULL OR categoryId = :categoryId)
            AND (:sourceId IS NULL OR sourceId = :sourceId)
+           AND (:scope IS NULL OR scope = :scope)
            AND publishedAt BETWEEN :from AND :to
            ORDER BY publishedAt DESC LIMIT :limit"""
     )
-    fun observeFeed(categoryId: String?, sourceId: String?, from: Long, to: Long, limit: Int): Flow<List<ArticleEntity>>
+    fun observeFeed(categoryId: String?, sourceId: String?, scope: String?, from: Long, to: Long, limit: Int): Flow<List<ArticleEntity>>
+
+    /** Newest articles whose text is not yet available in [target]. */
+    @Query(
+        """SELECT * FROM articles WHERE (trLang IS NULL OR trLang != :target)
+           AND (language IS NULL OR language != :target)
+           ORDER BY publishedAt DESC LIMIT :limit"""
+    )
+    suspend fun needingTranslation(target: String, limit: Int): List<ArticleEntity>
+
+    @Query(
+        """SELECT COUNT(*) FROM articles WHERE (trLang IS NULL OR trLang != :target)
+           AND (language IS NULL OR language != :target) AND publishedAt >= :since"""
+    )
+    fun observePendingTranslation(target: String, since: Long): Flow<Int>
+
+    @Query("UPDATE articles SET titleTr = :title, descriptionTr = :description, trLang = :target, language = COALESCE(:detected, language) WHERE id = :id")
+    suspend fun setTranslation(id: String, title: String?, description: String?, target: String, detected: String?)
 
     @Query("SELECT * FROM articles WHERE storyId = :storyId ORDER BY publishedAt ASC")
     fun observeByStory(storyId: String): Flow<List<ArticleEntity>>
@@ -159,6 +169,8 @@ interface ArticleDao {
     @Query(
         """SELECT storyId AS id, COUNT(*) AS articleCount, COUNT(DISTINCT sourceName) AS sourceCount,
            MIN(publishedAt) AS firstPublishedAt, MAX(publishedAt) AS lastPublishedAt,
+           SUM(CASE WHEN scope = 'local' THEN 1 ELSE 0 END) AS localCount,
+           SUM(CASE WHEN scope = 'global' THEN 1 ELSE 0 END) AS globalCount,
            (SELECT imageUrl FROM articles a2 WHERE a2.storyId = :storyId AND a2.imageUrl IS NOT NULL ORDER BY a2.publishedAt LIMIT 1) AS imageUrl
            FROM articles WHERE storyId = :storyId"""
     )
@@ -178,6 +190,8 @@ data class StoryAggRow(
     val sourceCount: Int,
     val firstPublishedAt: Long?,
     val lastPublishedAt: Long?,
+    val localCount: Int?,
+    val globalCount: Int?,
     val imageUrl: String?,
 )
 
@@ -207,6 +221,17 @@ interface StoryDao {
            LIMIT :limit"""
     )
     fun observeForCategories(categoryIds: List<String>, from: Long, to: Long, byRelevance: Boolean, limit: Int): Flow<List<StoryEntity>>
+
+    /** Home feed: one category (or all) for Egypt (local) or the world (global), newest first. */
+    @Query(
+        """SELECT * FROM stories WHERE (:categoryId IS NULL OR categoryId = :categoryId)
+           AND ((:local = 1 AND hasLocal = 1) OR (:local = 0 AND hasGlobal = 1))
+           ORDER BY lastPublishedAt DESC LIMIT :limit"""
+    )
+    fun observeScoped(categoryId: String?, local: Boolean, limit: Int): Flow<List<StoryEntity>>
+
+    @Query("UPDATE stories SET headlineTr = :headline, trLang = :target WHERE id = :id")
+    suspend fun setHeadlineTr(id: String, headline: String?, target: String)
 
     @Query("SELECT * FROM stories WHERE lastPublishedAt >= :since ORDER BY sourceCount DESC, articleCount DESC, lastPublishedAt DESC LIMIT :limit")
     fun observeTop(since: Long, limit: Int): Flow<List<StoryEntity>>

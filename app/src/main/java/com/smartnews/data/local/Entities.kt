@@ -38,7 +38,7 @@ data class SourceEntity(
 
 @Entity(
     tableName = "articles",
-    indices = [Index("publishedAt"), Index("storyId"), Index("categoryId"), Index("sourceId"), Index("isSaved")],
+    indices = [Index("publishedAt"), Index("storyId"), Index("categoryId"), Index("sourceId"), Index("isSaved"), Index("scope")],
 )
 data class ArticleEntity(
     /** sha1(canonical url) – stable across refreshes, so re-fetching never duplicates. */
@@ -69,6 +69,12 @@ data class ArticleEntity(
     /** "\n"-separated key points. */
     val keyPoints: String = "",
     val summaryIsAi: Boolean = false,
+    /** "local" (Egypt) or "global". */
+    val scope: String = "global",
+    /** Machine translation of title/description into [trLang]. */
+    val titleTr: String? = null,
+    val descriptionTr: String? = null,
+    val trLang: String? = null,
 )
 
 @Entity(tableName = "stories", indices = [Index("lastPublishedAt"), Index("categoryId")])
@@ -90,6 +96,10 @@ data class StoryEntity(
     val aiExplanationJson: String? = null,
     val mediaFetchedAt: Long? = null,
     val notifiedAt: Long? = null,
+    val hasLocal: Boolean = false,
+    val hasGlobal: Boolean = true,
+    val headlineTr: String? = null,
+    val trLang: String? = null,
 )
 
 @Entity(tableName = "media", indices = [Index("storyId"), Index("type"), Index("isSaved")])

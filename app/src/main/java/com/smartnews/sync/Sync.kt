@@ -50,6 +50,7 @@ class SyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = try {
         val r = repository.refresh()
+        runCatching { repeat(8) { if (repository.translatePending(25) == 0) return@runCatching } }
         // Retry later only if *everything* failed (e.g. flaky network); partial failures are normal.
         if (r.sourcesOk == 0 && r.sourcesFailed > 0) Result.retry() else Result.success()
     } catch (e: Exception) {
@@ -108,7 +109,7 @@ class Notifier @Inject constructor(@ApplicationContext private val context: Cont
         return (maxPerDay - sent).coerceAtLeast(0)
     }
 
-    fun showStory(story: Story) {
+    fun showStory(story: Story, lang: String) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
@@ -117,12 +118,14 @@ class Notifier @Inject constructor(@ApplicationContext private val context: Cont
             putExtra(MainActivity.EXTRA_STORY_ID, story.id)
         }
         val pi = PendingIntent.getActivity(context, story.id.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val text = if (story.sourceCount > 1) "${story.sourceCount} sources are reporting" else story.leadSourceName
+        val ar = lang == "ar"
+        val headline = story.headlineFor(lang)
+        val text = if (story.sourceCount > 1) (if (ar) "${story.sourceCount} مصادر تنقل الخبر" else "${story.sourceCount} sources are reporting") else story.leadSourceName
         val n = NotificationCompat.Builder(context, if (story.isBreaking) CH_BREAKING else CH_UPDATES)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(if (story.isBreaking) "Breaking · ${story.headline}" else story.headline)
+            .setContentTitle(if (story.isBreaking) (if (ar) "عاجل · $headline" else "Breaking · $headline") else headline)
             .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(story.headline))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(headline))
             .setAutoCancel(true)
             .setContentIntent(pi)
             .build()
