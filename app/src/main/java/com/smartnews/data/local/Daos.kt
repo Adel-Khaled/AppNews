@@ -119,6 +119,14 @@ interface ArticleDao {
     )
     suspend fun needingTranslation(target: String, limit: Int): List<ArticleEntity>
 
+    /** Story headlines first (what the user sees on Home), newest stories first. */
+    @Query(
+        """SELECT a.* FROM articles a JOIN stories s ON s.id = a.id
+           WHERE (a.trLang IS NULL OR a.trLang != :target) AND (a.language IS NULL OR a.language != :target)
+           ORDER BY s.lastPublishedAt DESC LIMIT :limit"""
+    )
+    suspend fun leadsNeedingTranslation(target: String, limit: Int): List<ArticleEntity>
+
     @Query(
         """SELECT COUNT(*) FROM articles WHERE (trLang IS NULL OR trLang != :target)
            AND (language IS NULL OR language != :target) AND publishedAt >= :since"""

@@ -70,6 +70,7 @@ import com.smartnews.ui.components.SectionHeader
 import com.smartnews.ui.components.TranslatedBadge
 import com.smartnews.ui.components.VideoRow
 import com.smartnews.ui.components.dateTime
+import com.smartnews.ui.components.sourcesLabel
 import com.smartnews.ui.components.tr
 import com.smartnews.ui.navigation.Nav
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -172,7 +173,7 @@ fun StoryDetailScreen(nav: Nav, vm: StoryDetailViewModel = hiltViewModel()) {
                 Column(Modifier.padding(16.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (s.isBreaking) BreakingBadge()
-                        Pill(tr("${s.sourceCount} sources", "${s.sourceCount} مصادر"), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer)
+                        Pill(sourcesLabel(s.sourceCount), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer)
                         if (anyTranslated && !showOriginal) TranslatedBadge()
                     }
                     Spacer(Modifier.height(10.dp))

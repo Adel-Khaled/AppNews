@@ -409,7 +409,8 @@ class NewsRepositoryImpl @Inject constructor(
             if (!translator.supported(target)) return@withContext 0
             var done = 0
             val t0 = System.currentTimeMillis()
-            for (a in articleDao.needingTranslation(target, limit)) {
+            val batch = articleDao.leadsNeedingTranslation(target, limit).ifEmpty { articleDao.needingTranslation(target, limit) }
+            for (a in batch) {
                 if (translateArticle(a, target)) done++ else break // model missing / offline: retry later
             }
             android.util.Log.i("SmartNewsTr", "translated $done to $target in ${System.currentTimeMillis() - t0} ms")

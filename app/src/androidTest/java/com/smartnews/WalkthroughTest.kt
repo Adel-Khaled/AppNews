@@ -143,7 +143,8 @@ class WalkthroughTest {
         alive("settings")
 
         // 11. Restart: news is still there (stored locally).
-        device.executeShellCommand("am force-stop $pkg")
+        device.pressHome()
+        Thread.sleep(2000)
         relaunch()
         check("after restart, stored news shows immediately", has("story", 15_000))
         shot("14_after_restart")

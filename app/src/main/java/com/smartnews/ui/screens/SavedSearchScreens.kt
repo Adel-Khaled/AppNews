@@ -36,7 +36,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.content.Context
+import android.view.inputmethod.InputMethodManager
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
@@ -181,7 +184,12 @@ fun SearchScreen(nav: Nav, initialQuery: String, vm: SearchViewModel = hiltViewM
     var filter by remember { mutableStateOf<DateFilter>(DateFilter.All) }
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
-    val run = { focus.clearFocus(); keyboard?.hide(); vm.search(q, cat, filter, type) }
+    val view = LocalView.current
+    val run = {
+        focus.clearFocus(); keyboard?.hide()
+        (view.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(view.windowToken, 0)
+        vm.search(q, cat, filter, type)
+    }
     LaunchedEffect(Unit) { if (initialQuery.isNotBlank()) run() }
 
     ScreenFrame(tr("Search", "بحث"), nav, isRefreshing = loading) {

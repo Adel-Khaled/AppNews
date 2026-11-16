@@ -87,6 +87,15 @@ import java.util.Locale
 /** App language ("ar" or "en"), provided at the root from Settings. */
 val LocalLang = staticCompositionLocalOf { "ar" }
 
+/** "3 sources" / "٣ مصادر" with correct Arabic singular/dual. */
+@Composable
+fun sourcesLabel(n: Int): String = if (LocalLang.current != "ar") (if (n == 1) "1 source" else "$n sources") else when (n) {
+    1 -> "مصدر واحد"
+    2 -> "مصدران"
+    in 3..10 -> "$n مصادر"
+    else -> "$n مصدراً"
+}
+
 /** Inline bilingual text: tr("Home", "الرئيسية"). */
 @Composable
 fun tr(en: String, ar: String): String = if (LocalLang.current == "ar") ar else en
@@ -186,7 +195,7 @@ fun HeroStoryCard(story: Story, onClick: () -> Unit, modifier: Modifier = Modifi
             Column(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (story.isBreaking) BreakingBadge()
-                    if (story.sourceCount > 1) Pill(tr("${story.sourceCount} sources", "${story.sourceCount} مصادر"), Color(0x33FFFFFF), Color.White, Icons.Default.Layers)
+                    if (story.sourceCount > 1) Pill(sourcesLabel(story.sourceCount), Color(0x33FFFFFF), Color.White, Icons.Default.Layers)
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(story.headlineFor(lang), style = MaterialTheme.typography.headlineSmall, color = Color.White, maxLines = 3,
@@ -208,7 +217,7 @@ fun StoryCard(story: Story, onClick: () -> Unit, modifier: Modifier = Modifier) 
                 if (story.isBreaking || story.sourceCount > 1) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (story.isBreaking) BreakingBadge()
-                        if (story.sourceCount > 1) Pill(tr("${story.sourceCount} sources", "${story.sourceCount} مصادر"),
+                        if (story.sourceCount > 1) Pill(sourcesLabel(story.sourceCount),
                             MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer, Icons.Default.Layers)
                     }
                     Spacer(Modifier.height(6.dp))
