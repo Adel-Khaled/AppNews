@@ -66,6 +66,8 @@ android {
             versionNameSuffix = "-debug"
         }
         release {
+            // Phones are ARM; leaving out emulator (x86) code keeps the APK much smaller.
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
             isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

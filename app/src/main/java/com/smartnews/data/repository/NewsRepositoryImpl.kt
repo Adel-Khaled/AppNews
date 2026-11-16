@@ -283,6 +283,16 @@ class NewsRepositoryImpl @Inject constructor(
         )
     }
 
+    /** Placeholder headlines ("META_TITLE_QUOTE") and spam ("*%[<SPORT TV]]* … LIVE Stream Free"). */
+    private fun looksLikeJunk(title: String): Boolean {
+        if (title.length < 12) return true
+        if (Regex("^[A-Z0-9_ ]+$").matches(title) && title.contains('_')) return true
+        if (title.count { it in "[]<>{}*%|" } >= 3) return true
+        val t = title.lowercase()
+        return Regex("live ?stream|watch (it )?(free|online)|full match|free tv|tv channel|streaming free|reddit stream").containsMatchIn(t) &&
+            Regex("\bvs\.?\b|free|tv channel|reddit|online").containsMatchIn(t)
+    }
+
     private data class StoreResult(val inserted: Int, val updated: Int, val newMedia: Int)
 
     private fun isArabicScript(text: String): Boolean {
@@ -301,7 +311,7 @@ class NewsRepositoryImpl @Inject constructor(
         val byId = LinkedHashMap<String, Pair<ArticleEntity, Incoming>>()
         for (raw in incoming) {
             // Skip placeholder headlines some feeds emit (e.g. "META_TITLE_QUOTE").
-            if (raw.title.length < 12 || Regex("^[A-Z0-9_ ]+$").matches(raw.title) && raw.title.contains('_')) continue
+            if (looksLikeJunk(raw.title)) continue
             // Evergreen feed entries ("Watch live", "About us") carry years-old dates; they are not news.
             if (raw.publishedAt != null && raw.publishedAt < now - 45 * DAY) continue
             val inc = if (raw.description.startsWith(raw.title.take(40))) raw.copy(description = "") else raw

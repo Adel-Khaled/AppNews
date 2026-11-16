@@ -32,7 +32,13 @@ class WalkthroughTest {
     /** Tabs further along the row are off-screen; swipe the row until the tab appears. */
     private fun clickTab(id: String): Boolean {
         repeat(10) { i ->
-            device.findObject(By.res("tab-$id"))?.let { it.click(); return true }
+            device.findObject(By.res("tab-$id"))?.let { tab ->
+                Thread.sleep(1200) // let any swipe fling settle before tapping
+                device.findObject(By.res("tab-$id"))?.click() ?: tab.click()
+                Thread.sleep(1500)
+                return runCatching { device.findObject(By.res("tab-$id"))?.isSelected == true }.getOrDefault(false)
+                    .also { if (!it) failures += "tab '$id' did not become selected" }
+            }
             val row = device.findObject(By.res("tab-row"))?.visibleBounds ?: return@repeat
             val y = row.centerY()
             // Real finger swipe; first one way (Arabic: later tabs are on the left), then the other.
