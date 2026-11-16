@@ -302,6 +302,8 @@ class NewsRepositoryImpl @Inject constructor(
         for (raw in incoming) {
             // Skip placeholder headlines some feeds emit (e.g. "META_TITLE_QUOTE").
             if (raw.title.length < 12 || Regex("^[A-Z0-9_ ]+$").matches(raw.title) && raw.title.contains('_')) continue
+            // Evergreen feed entries ("Watch live", "About us") carry years-old dates; they are not news.
+            if (raw.publishedAt != null && raw.publishedAt < now - 45 * DAY) continue
             val inc = if (raw.description.startsWith(raw.title.take(40))) raw.copy(description = "") else raw
             val id = TextAnalysis.sha1(TextAnalysis.canonicalUrl(inc.url))
             if (id in byId) continue

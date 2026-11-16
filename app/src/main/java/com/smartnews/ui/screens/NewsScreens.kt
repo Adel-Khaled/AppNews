@@ -117,7 +117,7 @@ fun HomeScreen(nav: Nav, vm: HomeViewModel = hiltViewModel()) {
         },
     ) {
         ScopeSwitch(scope, vm::setScope)
-        ScrollableTabRow(selectedTabIndex = selectedIndex, edgePadding = 12.dp) {
+        ScrollableTabRow(selectedTabIndex = selectedIndex, edgePadding = 12.dp, modifier = Modifier.testTag("tab-row")) {
             tabs.forEachIndexed { i, (id, label) ->
                 Tab(selected = i == selectedIndex, onClick = { vm.select(id) }, text = { Text(label) },
                     modifier = Modifier.testTag("tab-" + (id ?: "all")))

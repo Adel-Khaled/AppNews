@@ -62,6 +62,8 @@ class WalkthroughTest {
     @Test
     fun walkthrough() {
         device.executeShellCommand("mkdir -p /data/local/tmp/shots")
+        // Real breaking-news notifications pop up over the top of the screen; keep them out of the way.
+        device.executeShellCommand("settings put global heads_up_notifications_enabled 0")
         relaunch()
 
         // 1. Home loads news on first launch (English device → English UI, World by default).
@@ -73,6 +75,8 @@ class WalkthroughTest {
         alive("politics tab")
         if (click("tab-economy")) { check("economy tab shows stories", has("story", 120_000)); shot("03_tab_economy") }
         alive("economy tab")
+        device.findObject(By.res("tab-row"))?.scroll(androidx.test.uiautomator.Direction.LEFT, 1f)
+        Thread.sleep(800)
         click("tab-all")
 
         // 3. Egypt (local) news.
@@ -92,7 +96,6 @@ class WalkthroughTest {
             check("Arabic: world headlines translated to Arabic", waitArabic("story-title", 300_000, 0.6))
             shot("06_arabic_global")
             if (click("tab-sports")) { has("story", 120_000); shot("07_arabic_sports") }
-            click("tab-all")
         }
         alive("arabic")
 
